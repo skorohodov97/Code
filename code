@@ -1,0 +1,71 @@
+import time
+import threading
+import queue
+
+class Message:
+    def __init__(self, processing_time, requires_confirmation, priority):
+        self.processing_time = processing_time
+        self.requires_confirmation = requires_confirmation
+        self.priority = priority
+
+class MessageServer:
+    def __init__(self):
+        self.message_queue = queue.PriorityQueue()
+        self.processors = []
+
+    def add_processor(self, processor):
+        self.processors.append(processor)
+
+    def receive_message(self, message):
+        self.message_queue.put((message.priority, message))
+
+    def send_confirmation(self, generator):
+        print("Confirmation sent to generator:", generator)
+
+    def process_messages(self):
+        while True:
+            _, message = self.message_queue.get()
+            print("Processing message with priority", message.priority)
+            time.sleep(message.processing_time)
+            if message.requires_confirmation:
+                self.send_confirmation(message.generator)
+
+            self.message_queue.task_done()
+
+class MessageProcessor:
+    def __init__(self, server):
+        self.server = server
+
+    def process_message(self):
+        while True:
+            message = self.server.message_queue.get()
+            print("Processing message")
+            time.sleep(message.processing_time)
+            if message.requires_confirmation:
+                self.server.send_confirmation(message.generator)
+
+            self.server.message_queue.task_done()
+
+# Создаем сервер сообщений
+server = MessageServer()
+
+# Создаем и добавляем обработчики сообщений
+processor1 = MessageProcessor(server)
+processor2 = MessageProcessor(server)
+server.add_processor(processor1)
+server.add_processor(processor2)
+
+# Создаем и отправляем сообщения в очередь сервера
+message1 = Message(5, True, 2)
+message2 = Message(3, False, 1)
+message3 = Message(7, True, 3)
+server.receive_message(message1)
+server.receive_message(message2)
+server.receive_message(message3)
+
+# Запускаем обработку сообщений
+threading.Thread(target=server.process_messages).start()
+
+# Запускаем обработчики сообщений
+threading.Thread(target=processor1.process_message).start()
+threading.Thread(target=processor2.process_message).start()
